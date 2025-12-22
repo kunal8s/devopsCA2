@@ -20,7 +20,7 @@ const apiRoutes = require('./src/routes/api');
 
 const app = express();
 
-// Security middleware
+// Security middleware remove this written from remove part
 app.use(helmet());
 app.use(cors({
   origin: process.env.FRONTEND_URL,
