@@ -1,0 +1,24 @@
+{"level":"info","message":"🚀 Server running in development mode","service":"exam-proctoring-backend","timestamp":"2025-12-07 11:02:03"}
+{"level":"info","message":"📡 Listening on http://0.0.0.0:3000","service":"exam-proctoring-backend","timestamp":"2025-12-07 11:02:03"}
+{"level":"info","message":{"environment":"development","host":"0.0.0.0","memory":{"arrayBuffers":18675,"external":2197483,"heapTotal":20176896,"heapUsed":12405120,"rss":49393664},"node_version":"v22.16.0","pid":15392,"platform":"win32","port":"3000","uptime":0.5085453},"service":"exam-proctoring-backend","timestamp":"2025-12-07 11:02:03"}
+{"level":"info","message":"SIGINT received. Starting graceful shutdown...","service":"exam-proctoring-backend","timestamp":"2025-12-07 11:09:12"}
+{"level":"info","message":"🚀 Server running in development mode","service":"exam-proctoring-backend","timestamp":"2025-12-07 11:09:21"}
+{"level":"info","message":"📡 Listening on http://0.0.0.0:3000","service":"exam-proctoring-backend","timestamp":"2025-12-07 11:09:21"}
+{"level":"info","message":{"environment":"development","host":"0.0.0.0","memory":{"arrayBuffers":18851,"external":2223814,"heapTotal":20246528,"heapUsed":12383904,"rss":51970048},"node_version":"v22.16.0","pid":17620,"platform":"win32","port":"3000","uptime":0.7589213},"service":"exam-proctoring-backend","timestamp":"2025-12-07 11:09:21"}
+{"level":"info","message":"🚀 Server running in development mode","service":"exam-proctoring-backend","timestamp":"2025-12-07 11:10:07"}
+{"level":"info","message":"📡 Listening on http://0.0.0.0:3000","service":"exam-proctoring-backend","timestamp":"2025-12-07 11:10:07"}
+{"level":"info","message":{"environment":"development","host":"0.0.0.0","memory":{"arrayBuffers":18851,"external":2223814,"heapTotal":19984384,"heapUsed":12364032,"rss":52162560},"node_version":"v22.16.0","pid":20532,"platform":"win32","port":"3000","uptime":0.891075},"service":"exam-proctoring-backend","timestamp":"2025-12-07 11:10:07"}
+{"level":"info","message":"🚀 Server running in development mode","service":"exam-proctoring-backend","timestamp":"2025-12-07 11:10:35"}
+{"level":"info","message":"📡 Listening on http://0.0.0.0:3000","service":"exam-proctoring-backend","timestamp":"2025-12-07 11:10:35"}
+{"level":"info","message":{"environment":"development","host":"0.0.0.0","memory":{"arrayBuffers":18851,"external":2223814,"heapTotal":20176896,"heapUsed":12712024,"rss":52649984},"node_version":"v22.16.0","pid":2724,"platform":"win32","port":"3000","uptime":0.833053},"service":"exam-proctoring-backend","timestamp":"2025-12-07 11:10:35"}
+{"level":"info","message":"🚀 Server running in development mode","service":"exam-proctoring-backend","timestamp":"2025-12-07 11:10:53"}
+{"level":"info","message":"📡 Listening on http://0.0.0.0:3000","service":"exam-proctoring-backend","timestamp":"2025-12-07 11:10:53"}
+{"level":"info","message":{"environment":"development","host":"0.0.0.0","memory":{"arrayBuffers":18851,"external":2223814,"heapTotal":19914752,"heapUsed":12707088,"rss":52445184},"node_version":"v22.16.0","pid":1464,"platform":"win32","port":"3000","uptime":0.8059985},"service":"exam-proctoring-backend","timestamp":"2025-12-07 11:10:53"}
+{"level":"info","message":"🚀 Server running in development mode","service":"exam-proctoring-backend","timestamp":"2025-12-07 11:17:07"}
+{"level":"info","message":"📡 Listening on http://0.0.0.0:3000","service":"exam-proctoring-backend","timestamp":"2025-12-07 11:17:07"}
+{"level":"info","message":{"environment":"development","host":"0.0.0.0","memory":{"arrayBuffers":18851,"external":2223814,"heapTotal":19722240,"heapUsed":12794752,"rss":56991744},"node_version":"v22.16.0","pid":18028,"platform":"win32","port":"3000","uptime":0.8338556},"service":"exam-proctoring-backend","timestamp":"2025-12-07 11:17:07"}
+{"level":"info","message":"SIGINT received. Starting graceful shutdown...","service":"exam-proctoring-backend","timestamp":"2025-12-07 11:17:57"}
+{"level":"info","message":"🚀 Server running in development mode","service":"exam-proctoring-backend","timestamp":"2025-12-07 11:20:14"}
+{"level":"info","message":"📡 Listening on http://0.0.0.0:3000","service":"exam-proctoring-backend","timestamp":"2025-12-07 11:20:14"}
+{"level":"info","message":{"environment":"development","host":"0.0.0.0","memory":{"arrayBuffers":18851,"external":2223814,"heapTotal":20246528,"heapUsed":12809424,"rss":56975360},"node_version":"v22.16.0","pid":3928,"platform":"win32","port":"3000","uptime":0.7798807},"service":"exam-proctoring-backend","timestamp":"2025-12-07 11:20:14"}
+{"level":"info","message":"SIGINT received. Starting graceful shutdown...","service":"exam-proctoring-backend","timestamp":"2025-12-07 11:51:55"}

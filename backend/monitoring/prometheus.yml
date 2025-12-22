@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - alert_rules.yml
+
+scrape_configs:
+  - job_name: 'exam_backend'
+    metrics_path: /metrics
+    static_configs:
+      # Assumes the Node backend is running on the host at port 5000.
+      # Docker desktops expose the host as "host.docker.internal" inside containers.
+      - targets: ['host.docker.internal:5000']
+

@@ -1,0 +1,102 @@
+groups:
+  - name: api-health
+    interval: 30s
+    rules:
+      - alert: HighApiErrorRate
+        expr: |
+          sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+            /
+          sum(rate(http_requests_total[5m]))
+          > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          area: api
+        annotations:
+          summary: "High API error rate"
+          description: "5xx error rate is above 5% over the last 10 minutes."
+
+      - alert: VeryHighApiErrorRate
+        expr: |
+          sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+            /
+          sum(rate(http_requests_total[5m]))
+          > 0.15
+        for: 5m
+        labels:
+          severity: critical
+          area: api
+        annotations:
+          summary: "Very high API error rate"
+          description: "5xx error rate is above 15% over the last 5 minutes."
+
+      - alert: HighRequestLatencyP95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 2
+        for: 10m
+        labels:
+          severity: warning
+          area: api
+        annotations:
+          summary: "High p95 request latency"
+          description: "p95 request latency is above 2 seconds for 10 minutes."
+
+  - name: exams
+    interval: 60s
+    rules:
+      - alert: ExamSubmissionFailuresHigh
+        expr: |
+          sum(rate(exam_submission_failures_total[15m])) > 5
+        for: 15m
+        labels:
+          severity: warning
+          area: exams
+        annotations:
+          summary: "High rate of exam submission failures"
+          description: "Exam submission failures are above 5 per 15 minutes."
+
+  - name: uploads-media
+    interval: 60s
+    rules:
+      - alert: UploadFailuresHigh
+        expr: |
+          sum(rate(file_uploads_total{status="failure"}[15m])) > 5
+        for: 15m
+        labels:
+          severity: warning
+          area: uploads
+        annotations:
+          summary: "High rate of upload failures"
+          description: "File upload failures are above 5 per 15 minutes."
+
+      - alert: VideoProcessingFailuresHigh
+        expr: |
+          sum(rate(video_processing_failures_total[15m])) > 3
+        for: 15m
+        labels:
+          severity: warning
+          area: media
+        annotations:
+          summary: "High rate of video processing failures"
+          description: "Video processing failures are above 3 per 15 minutes."
+
+  - name: proctoring
+    interval: 60s
+    rules:
+      - alert: ProctoringViolationsSpike
+        expr: |
+          sum(rate(proctoring_violations_total[5m])) > 20
+        for: 10m
+        labels:
+          severity: warning
+          area: proctoring
+        annotations:
+          summary: "Spike in proctoring violations"
+          description: "Proctoring violations are higher than usual; investigate for possible cheating or system issues."
+
+
+
+
