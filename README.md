@@ -132,6 +132,7 @@ The following branches were created and used in this project:
 
 4. Merge Operation
 <img width="1920" height="1080" alt="Screenshot (2411)" src="https://github.com/user-attachments/assets/dac4ad5e-a525-426c-a381-a6e0b6c0e994" />
+
 <img width="1920" height="1080" alt="Screenshot (2412)" src="https://github.com/user-attachments/assets/9338a03e-b855-4235-b53b-5bc0b5473347" />
 
 
@@ -143,6 +144,7 @@ The following branches were created and used in this project:
 
 7. GitHub Repository
 <img width="1920" height="1080" alt="Screenshot (2414)" src="https://github.com/user-attachments/assets/7ce55d7f-844c-4219-9e57-016f5b08c9c9" />
+
 <img width="1920" height="1080" alt="Screenshot (2416)" src="https://github.com/user-attachments/assets/9325f198-038c-4c8b-ae5c-926ec22d45f1" />
 
 
@@ -151,6 +153,16 @@ The following branches were created and used in this project:
 
 9. Branch history
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/c3afd1f0-b105-43e3-af72-7603d7d84640" />
+
+10. Metrics endpoints readings
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/b52e479c-99fd-4b0c-9068-4d1889e200c2" />
+
+11. Docker startup
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/aab0bebd-7268-44c2-886a-44ff1fa456ef" />
+
+12. Grafana Dashboard
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/5088b0e7-17bf-4f2c-97b7-15da22553a21" />
+
 
 🚧 Challenges Faced
 - Understanding merge conflicts
