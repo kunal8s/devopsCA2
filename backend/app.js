@@ -14,7 +14,7 @@ require('dotenv').config();
 // again shit
 
 // just a random line for devops project later be removed 
-
+//ok
 // Import routes
 const authRoutes = require('./src/routes/api/v1/auth/authRoutes.js');
 const teacherAuthRoutes = require('./src/routes/api/v1/auth/teacherAuthRoutes.js');
