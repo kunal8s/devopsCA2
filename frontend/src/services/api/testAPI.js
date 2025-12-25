@@ -81,6 +81,78 @@ export const testAPI = {
     console.warn('clear() is not implemented in backend API');
     return Promise.resolve();
   },
+
+  /**
+   * Submit test attempt
+   * @param {string} testId - Test ID
+   * @param {Object} attemptData - Attempt data including answers, timeSpent, isAutoSubmitted
+   * @returns {Promise<Object>} Submission result
+   */
+  submitAttempt: async (testId, attemptData) => {
+    try {
+      const response = await axiosClient.post(`/v1/tests/${testId}/attempts`, attemptData);
+      const apiResponse = response?.data ?? response;
+      const resultData = apiResponse?.data ?? apiResponse;
+      return resultData;
+    } catch (error) {
+      console.error('Failed to submit attempt:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to submit test';
+      throw new Error(errorMessage);
+    }
+  },
+
+  /**
+   * Get attempt result
+   * @param {string} testId - Test ID
+   * @returns {Promise<Object>} Result data
+   */
+  getResult: async (testId) => {
+    try {
+      const response = await axiosClient.get(`/v1/tests/${testId}/attempts/result`);
+      const apiResponse = response?.data ?? response;
+      const resultData = apiResponse?.data ?? apiResponse;
+      return resultData;
+    } catch (error) {
+      console.error('Failed to fetch result:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch result';
+      throw new Error(errorMessage);
+    }
+  },
+
+  /**
+   * Check if student has attempted a test
+   * @param {string} testId - Test ID
+   * @returns {Promise<Object>} Check result
+   */
+  checkAttempt: async (testId) => {
+    try {
+      const response = await axiosClient.get(`/v1/tests/${testId}/attempts/check`);
+      const apiResponse = response?.data ?? response;
+      const resultData = apiResponse?.data ?? apiResponse;
+      return resultData;
+    } catch (error) {
+      console.error('Failed to check attempt:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to check attempt';
+      throw new Error(errorMessage);
+    }
+  },
+
+  /**
+   * Get all attempts for the logged-in student
+   * @returns {Promise<Array>} Attempts list
+   */
+  getMyAttempts: async () => {
+    try {
+      const response = await axiosClient.get('/v1/tests/attempts/my');
+      const apiResponse = response?.data ?? response;
+      const resultData = apiResponse?.data ?? apiResponse;
+      return resultData;
+    } catch (error) {
+      console.error('Failed to fetch attempts:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch attempts';
+      throw new Error(errorMessage);
+    }
+  },
 };
 
 export default testAPI;

@@ -9,15 +9,23 @@ const teacherAuthRoutes = require('./v1/auth/teacherAuthRoutes');
 const academicRoutes = require('./v1/academics/academicRoutes');
 const adminUserRoutes = require('./v1/users/adminRoutes');
 const testRoutes = require('./v1/tests/testRoutes');
+const announcementRoutes = require('./v1/announcements/announcementRoutes');
+const teacherRoutes = require('./v1/teacherRoutes');
+const systemConfigRoutes = require('./v1/admin/systemConfigRoutes');
+const chatRoutes = require('./v1/chat/chatRoutes');
 
 // Mount API routes
 router.use('/v1/stats', statsRoutes);
 router.use('/v1/student', studentRoutes);
+router.use('/v1/teacher', teacherRoutes);
 router.use('/v1/auth', authRoutes);
 router.use('/v1/auth/teacher', teacherAuthRoutes);
 router.use('/v1/academics', academicRoutes);
 router.use('/v1/admin', adminUserRoutes);
+router.use('/v1/admin/announcements', announcementRoutes);
+router.use('/v1/admin/system-config', systemConfigRoutes);
 router.use('/v1/tests', testRoutes);
+router.use('/v1/chat', chatRoutes);
 
 // API root
 router.get('/', (req, res) => {

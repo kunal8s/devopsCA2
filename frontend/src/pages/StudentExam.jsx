@@ -1,8 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { FaClock, FaExclamationTriangle, FaChevronLeft, FaChevronRight, FaSave, FaCheckCircle } from 'react-icons/fa';
 import { testAPI } from '../services/api/testAPI';
 import axiosClient from '../services/axiosClient';
+import screenSocket from '../services/realtime/screenSocket';
+import StudentChat from '../components/Chat/StudentChat';
+import StudentVideoProctor from '../components/VideoProctoring/StudentVideoProctor';
+import { studentAuthAPI } from '../services/api/authAPI';
 
 const STATUS = {
   UNVISITED: 'unvisited',
@@ -13,6 +18,7 @@ const STATUS = {
 const StudentExam = () => {
   const { testId } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [test, setTest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -24,13 +30,27 @@ const StudentExam = () => {
   const [autoSubmitted, setAutoSubmitted] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(null);
   const [startTime, setStartTime] = useState(null);
+  const [totalDuration, setTotalDuration] = useState(null); // Store initial duration in seconds
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [submissionResult, setSubmissionResult] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [devToolsWarningShown, setDevToolsWarningShown] = useState(false);
+  const [screenStream, setScreenStream] = useState(null);
+  const screenIntervalRef = useRef(null);
+  const [student, setStudent] = useState(null);
 
-  // Check authentication before loading test
+  // Check authentication before loading test and get student info
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
       navigate('/auth/student-login', { replace: true });
+      return;
+    }
+    
+    // Get student data from localStorage
+    const studentData = studentAuthAPI.getCurrentStudent();
+    if (studentData) {
+      setStudent(studentData);
     }
   }, [navigate]);
 
@@ -78,7 +98,9 @@ const StudentExam = () => {
 
         // Initialize time if duration is available
         if (testInfo.duration) {
-          setTimeRemaining(testInfo.duration * 60); // Convert minutes to seconds
+          const durationInSeconds = testInfo.duration * 60; // Convert minutes to seconds
+          setTotalDuration(durationInSeconds);
+          setTimeRemaining(durationInSeconds);
           setStartTime(new Date());
         }
       } catch (e) {
@@ -100,44 +122,138 @@ const StudentExam = () => {
     load();
   }, [testId]);
 
-  // Timer countdown
+  // Ask for screen sharing when the student starts the test
+  const startScreenShare = async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      console.warn('Screen sharing API not available in this browser.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { cursor: 'always' },
+        audio: false,
+      });
+      setScreenStream(stream);
+      // Begin sending thumbnail frames over Socket.io for teacher view
+      await startFrameStreaming(stream);
+    } catch (err) {
+      console.warn('Student denied screen sharing or an error occurred:', err);
+      // Do not block the exam; simply proceed without screen sharing.
+    }
+  };
+
+  const startFrameStreaming = async (stream) => {
+    try {
+      const studentRaw = localStorage.getItem('student');
+      const student = studentRaw ? JSON.parse(studentRaw) : null;
+      const studentId = student?._id || student?.id;
+      if (!studentId) {
+        console.warn('No student ID found for screen share');
+        return;
+      }
+
+      // Join signaling room once
+      if (!screenSocket.connected) {
+        screenSocket.connect();
+      }
+
+      screenSocket.emit('proctoring:join', {
+        testId,
+        role: 'student',
+        userId: studentId,
+      });
+
+      // Create hidden video + canvas for snapshots
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.muted = true;
+      await video.play();
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      // Target resolution for smoother streaming with lower bandwidth
+      const TARGET_WIDTH = 960;
+      const TARGET_HEIGHT = 540;
+
+      const sendFrame = () => {
+        if (video.readyState < 2) return;
+
+        // Downscale to a fixed HD-ish resolution to avoid heavy frames
+        const srcW = video.videoWidth || TARGET_WIDTH;
+        const srcH = video.videoHeight || TARGET_HEIGHT;
+        const scale = Math.min(TARGET_WIDTH / srcW, TARGET_HEIGHT / srcH);
+        const w = Math.round(srcW * scale);
+        const h = Math.round(srcH * scale);
+
+        canvas.width = w;
+        canvas.height = h;
+        ctx.drawImage(video, 0, 0, w, h);
+
+        const image = canvas.toDataURL('image/jpeg', 0.5); // slightly higher quality
+
+        if (screenSocket.connected) {
+          screenSocket.emit('screen:frame', {
+            testId,
+            studentId,
+            image,
+          });
+        }
+      };
+
+      // Send ~4fps thumbnails for smoother motion but still lightweight
+      if (screenIntervalRef.current) {
+        clearInterval(screenIntervalRef.current);
+      }
+      screenIntervalRef.current = window.setInterval(sendFrame, 250);
+
+      // Stop streaming when capture ends
+      stream.getVideoTracks()[0].addEventListener('ended', () => {
+        if (screenIntervalRef.current) {
+          clearInterval(screenIntervalRef.current);
+          screenIntervalRef.current = null;
+        }
+      });
+    } catch (err) {
+      console.error('Error starting thumbnail screen streaming:', err);
+    }
+  };
+
+  // Timer countdown - fixed to count accurately
   useEffect(() => {
-    if (!timeRemaining || !startTime || autoSubmitted) return;
+    if (!totalDuration || !startTime || autoSubmitted || submissionResult) return;
 
     const interval = setInterval(() => {
-      const elapsed = Math.floor((new Date() - startTime) / 1000);
-      const remaining = (timeRemaining - elapsed);
+      const now = new Date();
+      const elapsed = Math.floor((now - startTime) / 1000); // Elapsed time in seconds
+      const remaining = Math.max(0, totalDuration - elapsed);
+      
+      setTimeRemaining(remaining);
       
       if (remaining <= 0) {
         setTimeRemaining(0);
-        handleSubmit(true); // Auto-submit when time runs out
         clearInterval(interval);
-      } else {
-        setTimeRemaining(remaining);
+        handleSubmit(true, false); // Auto-submit when time runs out
       }
-    }, 1000);
+    }, 1000); // Update every second
 
     return () => clearInterval(interval);
-  }, [timeRemaining, startTime, autoSubmitted]);
+  }, [totalDuration, startTime, autoSubmitted, submissionResult]);
 
-  // Track tab/window focus for anti-cheat
+  // Track tab/window focus for anti-cheat (auto-submit temporarily disabled)
   useEffect(() => {
     if (!test || autoSubmitted || showInstructions) return;
 
     let devToolsOpen = false;
+
     const checkDevTools = setInterval(() => {
       const widthThreshold = window.outerWidth - window.innerWidth > 160;
       const heightThreshold = window.outerHeight - window.innerHeight > 160;
       if (widthThreshold || heightThreshold) {
         if (!devToolsOpen) {
           devToolsOpen = true;
-          setWarnings((prev) => {
-            const newWarnings = prev + 1;
-            if (newWarnings >= 3) {
-              handleSubmit(true);
-            }
-            return newWarnings;
-          });
+          // Only increment warnings for now; do NOT auto-submit
+          setWarnings((prev) => prev + 1);
         }
       } else {
         devToolsOpen = false;
@@ -145,13 +261,8 @@ const StudentExam = () => {
     }, 1000);
 
     const handleBlur = () => {
-      setWarnings((prev) => {
-        const newWarnings = prev + 1;
-        if (newWarnings >= 3) {
-          handleSubmit(true);
-        }
-        return newWarnings;
-      });
+      // Only increment warnings for tab switch; do NOT auto-submit
+      setWarnings((prev) => prev + 1);
     };
 
     const handleVisibilityChange = () => {
@@ -230,7 +341,7 @@ const StudentExam = () => {
     }
   };
 
-  const handleSubmit = async (forced = false) => {
+  const handleSubmit = async (forced = false, isAutoSubmitted = false) => {
     if (!forced && !showSubmitConfirm) {
       setShowSubmitConfirm(true);
       return;
@@ -246,27 +357,48 @@ const StudentExam = () => {
       return;
     }
 
+    if (isSubmitting) return; // Prevent double submission
+
     try {
-      // Save attempt to backend (TODO: implement backend API)
-      const attemptData = {
-        testId,
-        answers,
-        submittedAt: new Date().toISOString(),
-        timeSpent: startTime ? Math.floor((new Date() - startTime) / 1000) : 0,
-      };
-
-      // For now, save to localStorage
-      const attemptsRaw = localStorage.getItem('examAttempts');
-      const attempts = attemptsRaw ? JSON.parse(attemptsRaw) : [];
-      attempts.push(attemptData);
-      localStorage.setItem('examAttempts', JSON.stringify(attempts));
-
+      setIsSubmitting(true);
       setAutoSubmitted(true);
-      alert('Test submitted successfully!');
-      navigate('/student/dashboard', { replace: true });
+
+      // Prepare answers in the format expected by backend
+      const answerArray = questions.map((question, index) => {
+        const answerKey = String(index);
+        const selectedAnswer = answers[answerKey] && answers[answerKey].length > 0 
+          ? answers[answerKey][0] 
+          : null;
+        
+        return {
+          questionId: question.id,
+          selectedAnswer: selectedAnswer
+        };
+      });
+
+      const timeSpent = startTime ? Math.floor((new Date() - startTime) / 1000) : 0;
+
+      // Submit to backend
+      const result = await testAPI.submitAttempt(testId, {
+        answers: answerArray,
+        timeSpent: timeSpent,
+        isAutoSubmitted: isAutoSubmitted || warnings >= 3
+      });
+
+      // Store result and show it
+      setSubmissionResult(result);
+      
+      // Clear localStorage backup
+      localStorage.removeItem(`test_${testId}_answers`);
+      
+      // Invalidate dashboard query to refresh performance trends
+      queryClient.invalidateQueries({ queryKey: ['studentDashboard'] });
+      
     } catch (e) {
       console.error('Error submitting test:', e);
-      alert('Error submitting test. Please try again.');
+      setAutoSubmitted(false);
+      setIsSubmitting(false);
+      alert(e.message || 'Error submitting test. Please try again.');
     }
   };
 
@@ -355,10 +487,105 @@ const StudentExam = () => {
             </button>
             <button
               type="button"
-              onClick={() => setShowInstructions(false)}
+              onClick={async () => {
+                setShowInstructions(false);
+                // Request screen sharing as soon as the exam actually starts
+                await startScreenShare();
+              }}
               className="px-6 py-2.5 text-sm rounded-lg bg-sky-600 text-white hover:bg-sky-700 shadow-sm"
             >
               I understand, Start Test
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show result after submission
+  if (submissionResult) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="max-w-2xl w-full bg-white rounded-xl shadow-xl border border-slate-200 p-8">
+          <div className="text-center mb-6">
+            <div className={`w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center ${
+              submissionResult.isPassed ? 'bg-green-100' : 'bg-red-100'
+            }`}>
+              {submissionResult.isPassed ? (
+                <FaCheckCircle className="w-10 h-10 text-green-600" />
+              ) : (
+                <FaExclamationTriangle className="w-10 h-10 text-red-600" />
+              )}
+            </div>
+            <h2 className="text-2xl font-semibold text-slate-900 mb-2">
+              Test Submitted Successfully!
+            </h2>
+            {submissionResult.isAutoSubmitted && (
+              <p className="text-sm text-amber-600 mb-2">
+                Test was auto-submitted due to suspicious activity
+              </p>
+            )}
+          </div>
+
+          {/* Result Summary */}
+          <div className="bg-slate-50 rounded-lg p-6 mb-6">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">Your Score</h3>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="text-center">
+                <p className="text-3xl font-bold text-sky-600">
+                  {submissionResult.totalMarksObtained}
+                </p>
+                <p className="text-sm text-slate-600">Marks Obtained</p>
+              </div>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-slate-700">
+                  {submissionResult.totalMarksPossible}
+                </p>
+                <p className="text-sm text-slate-600">Total Marks</p>
+              </div>
+            </div>
+            <div className="text-center mb-4">
+              <p className="text-4xl font-bold text-slate-900">
+                {submissionResult.percentage}%
+              </p>
+              <p className="text-sm text-slate-600">Percentage</p>
+            </div>
+            <div className={`text-center py-2 rounded-lg ${
+              submissionResult.isPassed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+            }`}>
+              <p className="font-semibold">
+                {submissionResult.isPassed ? 'Passed ✓' : 'Failed ✗'}
+              </p>
+            </div>
+          </div>
+
+          {/* Detailed Statistics */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-green-50 rounded-lg p-4 text-center">
+              <p className="text-2xl font-bold text-green-600">{submissionResult.correctAnswers}</p>
+              <p className="text-xs text-slate-600 mt-1">Correct</p>
+            </div>
+            <div className="bg-red-50 rounded-lg p-4 text-center">
+              <p className="text-2xl font-bold text-red-600">{submissionResult.wrongAnswers}</p>
+              <p className="text-xs text-slate-600 mt-1">Wrong</p>
+            </div>
+            <div className="bg-blue-50 rounded-lg p-4 text-center">
+              <p className="text-2xl font-bold text-blue-600">{submissionResult.attemptedQuestions}</p>
+              <p className="text-xs text-slate-600 mt-1">Attempted</p>
+            </div>
+            <div className="bg-slate-100 rounded-lg p-4 text-center">
+              <p className="text-2xl font-bold text-slate-600">{submissionResult.notAttemptedQuestions}</p>
+              <p className="text-xs text-slate-600 mt-1">Not Attempted</p>
+            </div>
+          </div>
+
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => navigate('/student/available-exams', { replace: true })}
+              className="px-6 py-3 rounded-lg bg-sky-600 text-white hover:bg-sky-700 font-medium shadow-sm"
+            >
+              View Available Exams
             </button>
           </div>
         </div>
@@ -595,10 +822,11 @@ const StudentExam = () => {
             <button
               type="button"
               onClick={() => setShowSubmitConfirm(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-medium transition-colors shadow-sm"
+              disabled={isSubmitting || autoSubmitted}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <FaCheckCircle />
-              Submit Test
+              {isSubmitting ? 'Submitting...' : 'Submit Test'}
             </button>
           </div>
 
@@ -618,6 +846,23 @@ const StudentExam = () => {
           </div>
         </aside>
       </main>
+
+      {/* Video Proctoring Component - Initialize immediately so teacher can see video */}
+      {test && student && (
+        <StudentVideoProctor
+          testId={test.id || testId}
+          studentId={student._id || student.id}
+        />
+      )}
+
+      {/* Chat Component - Only show when test has started */}
+      {!showInstructions && test && student && (
+        <StudentChat
+          testId={test.id || testId}
+          studentId={student._id || student.id}
+          studentName={student.name || `${student.firstName} ${student.lastName}`}
+        />
+      )}
     </div>
   );
 };

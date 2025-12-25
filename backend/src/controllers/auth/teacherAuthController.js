@@ -22,21 +22,30 @@ class TeacherAuthController {
   // Create and send token
   createSendToken = (teacher, statusCode, res) => {
     const token = this.signToken(teacher._id);
-    
+
     // Remove password from output
     teacher.password = undefined;
-    
-    // Set cookie
-    const cookieOptions = {
-      expires: new Date(
-        Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
-      ),
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production'
-    };
-    
-    res.cookie('jwt', token, cookieOptions);
-    
+
+    // Optionally set an HTTP-only cookie when configuration is valid.
+    // For SPA + localStorage auth this cookie is not strictly required,
+    // so we guard against misconfigured env values instead of throwing.
+    const daysRaw = Number(process.env.JWT_COOKIE_EXPIRES_IN);
+    if (Number.isFinite(daysRaw) && daysRaw > 0) {
+      const cookieOptions = {
+        expires: new Date(
+          Date.now() + daysRaw * 24 * 60 * 60 * 1000
+        ),
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production'
+      };
+
+      try {
+        res.cookie('jwt', token, cookieOptions);
+      } catch (cookieErr) {
+        logger.error('Failed to set teacher auth cookie, continuing without cookie:', cookieErr);
+      }
+    }
+
     sendApiSuccess(
       res,
       statusCode,

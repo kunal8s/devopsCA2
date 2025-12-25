@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { FaSearch, FaBell, FaUserCircle } from 'react-icons/fa';
+import { FaSearch, FaUserCircle } from 'react-icons/fa';
+import NotificationBell from '../../../components/NotificationBell';
 
 const Header = ({ studentName, avatarUrl }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,10 +59,7 @@ const Header = ({ studentName, avatarUrl }) => {
             </div>
           )}
 
-          <button className="relative p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-full transition-colors">
-            <FaBell className="w-6 h-6" />
-            <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"></span>
-          </button>
+          <NotificationBell userType="student" />
         </div>
       </div>
     </header>

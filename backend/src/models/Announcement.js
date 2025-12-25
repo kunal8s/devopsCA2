@@ -21,6 +21,19 @@ const announcementSchema = new mongoose.Schema({
     enum: ['all', 'students', 'teachers'],
     default: 'all'
   },
+  targetType: {
+    type: String,
+    enum: ['all', 'specific'],
+    default: 'all'
+  },
+  targetStudents: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Student'
+  }],
+  targetTeachers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Teacher'
+  }],
   priority: {
     type: String,
     enum: ['low', 'medium', 'high', 'urgent'],
@@ -33,6 +46,14 @@ const announcementSchema = new mongoose.Schema({
   expiresAt: {
     type: Date
   },
+  readByStudents: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Student'
+  }],
+  readByTeachers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Teacher'
+  }],
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Teacher',
@@ -55,6 +76,11 @@ announcementSchema.index({ isActive: 1, createdAt: -1 });
 announcementSchema.index({ targetAudience: 1, isActive: 1 });
 
 module.exports = mongoose.model('Announcement', announcementSchema);
+
+
+
+
+
 
 
 

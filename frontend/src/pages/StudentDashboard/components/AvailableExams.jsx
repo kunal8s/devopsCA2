@@ -62,7 +62,10 @@ const AvailableExams = ({ exams }) => {
     return 'bg-sky-100 text-sky-600'; // MCQ
   };
 
-  if (!exams || exams.length === 0) {
+  // Remove attempted exams from the list
+  const visibleExams = (exams || []).filter((exam) => !exam.hasAttempted);
+
+  if (!visibleExams || visibleExams.length === 0) {
     return (
       <div className="text-center py-12">
         <p className="text-slate-500">No available exams</p>
@@ -72,7 +75,7 @@ const AvailableExams = ({ exams }) => {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {exams.map((exam, index) => {
+      {visibleExams.map((exam, index) => {
         const CourseIcon = getCourseIcon(exam.course);
         const TestTypeIcon = getTestTypeIcon(exam.testType);
         const testTypeColor = getTestTypeColor(exam.testType);

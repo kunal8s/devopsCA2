@@ -499,3 +499,58 @@ exports.diagnosticCheck = asyncHandler(async (req, res) => {
     );
   }
 });
+
+/**
+ * @desc    Get proctoring participants for a test (allocated students)
+ * @route   GET /api/v1/tests/:id/proctoring/participants
+ * @access  Private (Teacher/Admin UI – currently no role check, rely on API gateway/frontend)
+ */
+exports.getProctoringParticipants = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const test = await Test.findById(id)
+      .populate('allowedStudents', 'firstName lastName email batchYear currentYear section branch institution')
+      .select('title course scheduledDate duration allowedStudents status')
+      .lean();
+
+    if (!test) {
+      return res.status(404).json(
+        new ApiResponse(404, null, 'Test not found')
+      );
+    }
+
+    const students = (test.allowedStudents || []).map((s) => ({
+      id: s._id,
+      name: `${s.firstName} ${s.lastName}`,
+      email: s.email,
+      batchYear: s.batchYear,
+      currentYear: s.currentYear,
+      section: s.section,
+      branch: s.branch?.code || s.branch,
+      institution: s.institution?.name || s.institution,
+    }));
+
+    const payload = {
+      test: {
+        id: test._id,
+        title: test.title,
+        course: test.course,
+        scheduledDate: test.scheduledDate,
+        duration: test.duration,
+        status: test.status,
+        totalStudents: students.length,
+      },
+      students,
+    };
+
+    return res.status(200).json(
+      new ApiResponse(200, payload, 'Proctoring participants retrieved successfully')
+    );
+  } catch (error) {
+    logger.error('Error fetching proctoring participants:', error);
+    return res.status(500).json(
+      new ApiResponse(500, null, 'Failed to fetch proctoring participants')
+    );
+  }
+});

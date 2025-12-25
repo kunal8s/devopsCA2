@@ -26,16 +26,44 @@ const app = express();
 // Security middleware remove this written from remove part
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL,
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true
 }));
 
-// Rate limiting
-const limiter = rateLimit({
+// Rate limiting - increased limits for dashboard endpoints
+const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: 200, // Increased from 100 to 200 requests per 15 minutes
+  message: {
+    status: 'error',
+    message: 'Too many requests from this IP, please try again after a few minutes'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for health checks
+    return req.path === '/health' || req.path === '/metrics';
+  }
 });
-app.use('/api/', limiter);
+
+// More lenient rate limiter for dashboard endpoints
+const dashboardLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 300, // Higher limit for dashboard endpoints
+  message: {
+    status: 'error',
+    message: 'Too many requests, please wait a moment'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply more lenient limiter to dashboard routes FIRST (order matters)
+app.use('/api/v1/student/dashboard', dashboardLimiter);
+app.use('/api/v1/teacher', dashboardLimiter);
+
+// Apply general limiter to all other API routes
+app.use('/api/', generalLimiter);
 
 // Body parser
 app.use(express.json());

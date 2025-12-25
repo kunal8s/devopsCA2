@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FaUniversity, FaUsers, FaFilter, FaSearch, FaExclamationTriangle } from 'react-icons/fa';
+import { FaUniversity, FaUsers, FaFilter, FaSearch, FaExclamationTriangle, FaDownload, FaTrash } from 'react-icons/fa';
 import { academicsAPI } from '../../services/api/academicsAPI';
 import { adminUsersAPI } from '../../services/api/adminUsersAPI';
 
@@ -17,6 +17,7 @@ const AdminStudentsPage = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     const loadInstitutions = async () => {
@@ -97,6 +98,63 @@ const AdminStudentsPage = () => {
       setStudents([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const buildStudentRows = () => {
+    if (!students || students.length === 0) return [];
+    return students.map((s) => [
+      `${s.firstName || ''} ${s.lastName || ''}`.trim(),
+      s.email || '',
+      s.institution?.name || '',
+      s.branch?.code || '',
+      s.batchYear ?? '',
+      s.currentYear ?? '',
+      s.section || '',
+    ]);
+  };
+
+  const toCSV = () => {
+    const headers = ['Name', 'Email', 'Institution', 'Branch', 'Batch', 'Year', 'Section'];
+    const rows = buildStudentRows();
+    if (!rows.length) return '';
+    return [headers, ...rows]
+      .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+  };
+
+  const download = (ext) => {
+    const csv = toCSV();
+    if (!csv) {
+      alert('No student data to download');
+      return;
+    }
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `students.${ext}`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleDeleteStudent = async (studentId, studentName) => {
+    if (!window.confirm(`Are you sure you want to delete ${studentName}? This will permanently remove the student and all their exam attempts from the database. This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingId(studentId);
+    setError('');
+
+    try {
+      await adminUsersAPI.deleteStudent(studentId);
+      // Remove the student from the UI
+      setStudents(prevStudents => prevStudents.filter(s => (s._id || s.id) !== studentId));
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to delete student');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -248,14 +306,36 @@ const AdminStudentsPage = () => {
                 <h2 className="text-lg font-semibold text-slate-900">Students</h2>
               </div>
             </div>
-            <span className="text-sm text-slate-500">{students.length} found</span>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-slate-500">{students.length} found</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => download('csv')}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                  disabled={students.length === 0}
+                >
+                  <FaDownload className="w-3 h-3" />
+                  CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => download('xlsx')}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                  disabled={students.length === 0}
+                >
+                  <FaDownload className="w-3 h-3" />
+                  Excel
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-100">
               <thead className="bg-slate-50">
                 <tr>
-                  {['Name', 'Email', 'Institution', 'Branch', 'Batch', 'Year', 'Section'].map((h) => (
+                  {['Name', 'Email', 'Institution', 'Branch', 'Batch', 'Year', 'Section', 'Action'].map((h) => (
                     <th
                       key={h}
                       className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"
@@ -268,24 +348,43 @@ const AdminStudentsPage = () => {
               <tbody className="divide-y divide-slate-100">
                 {!loading && students.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-6 py-4 text-sm text-slate-500 text-center">
+                    <td colSpan={8} className="px-6 py-4 text-sm text-slate-500 text-center">
                       No students found. Adjust filters and try again.
                     </td>
                   </tr>
                 )}
-                {students.map((s) => (
-                  <tr key={s._id || s.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-4 text-sm font-medium text-slate-900">
-                      {s.firstName} {s.lastName}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{s.email}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{s.institution?.name || '—'}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{s.branch?.code || '—'}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{s.batchYear}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{s.currentYear}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{s.section}</td>
-                  </tr>
-                ))}
+                {students.map((s) => {
+                  const studentId = s._id || s.id;
+                  const studentName = `${s.firstName} ${s.lastName}`;
+                  const isDeleting = deletingId === studentId;
+                  
+                  return (
+                    <tr key={studentId} className="hover:bg-slate-50">
+                      <td className="px-6 py-4 text-sm font-medium text-slate-900">
+                        <div className="flex items-center justify-between">
+                          <span>{studentName}</span>
+                          <button
+                            onClick={() => handleDeleteStudent(studentId, studentName)}
+                            disabled={isDeleting || loading}
+                            className="ml-2 p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Remove student"
+                          >
+                            <FaTrash className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{s.email}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{s.institution?.name || '—'}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{s.branch?.code || '—'}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{s.batchYear}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{s.currentYear}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{s.section}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        {isDeleting && <span className="text-xs text-slate-400">Deleting...</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -296,6 +395,7 @@ const AdminStudentsPage = () => {
 };
 
 export default AdminStudentsPage;
+
 
 
 
