@@ -25,7 +25,8 @@ const Step1Email = ({ onNext, email, setEmail }) => {
     setLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/send-otp', { email });
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const response = await axios.post(`${API_URL}/auth/send-otp`, { email });
       
       if (response.data.success) {
         setSuccess('OTP sent successfully! Check your email.');

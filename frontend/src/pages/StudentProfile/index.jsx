@@ -47,11 +47,12 @@ const StudentProfile = () => {
       });
       if (profile.profileImage) {
         const rawUrl = profile.profileImage;
+        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
         const resolved =
           rawUrl.startsWith('http://') || rawUrl.startsWith('https://')
             ? rawUrl
             : rawUrl.startsWith('/uploads')
-            ? `http://localhost:5000${rawUrl}`
+            ? `${BACKEND_URL}${rawUrl}`
             : rawUrl;
         setPreviewUrl(resolved);
       }
@@ -112,7 +113,8 @@ const StudentProfile = () => {
       return rawUrl;
     }
     if (rawUrl.startsWith('/uploads')) {
-      return `http://localhost:5000${rawUrl}`;
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+      return `${BACKEND_URL}${rawUrl}`;
     }
     return rawUrl;
   })();

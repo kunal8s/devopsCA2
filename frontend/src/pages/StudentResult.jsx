@@ -78,7 +78,8 @@ const StudentResult = () => {
       return rawUrl;
     }
     if (rawUrl.startsWith('/uploads')) {
-      return `http://localhost:5000${rawUrl}`;
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+      return `${BACKEND_URL}${rawUrl}`;
     }
     return rawUrl;
   };

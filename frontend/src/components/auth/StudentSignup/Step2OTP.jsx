@@ -60,7 +60,8 @@ const Step2OTP = ({ email, onPrev, onNext, setTempToken }) => {
     setLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/send-otp', { email });
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const response = await axios.post(`${API_URL}/auth/send-otp`, { email });
       
       if (response.data.success) {
         setSuccess('New OTP sent successfully!');
@@ -90,7 +91,8 @@ const Step2OTP = ({ email, onPrev, onNext, setTempToken }) => {
     setSuccess('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/verify-otp', {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const response = await axios.post(`${API_URL}/auth/verify-otp`, {
         email,
         otp: otpString
       });

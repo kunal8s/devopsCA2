@@ -110,9 +110,10 @@ const StudentDashboard = () => {
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
       return rawUrl;
     }
-    // Backend serves uploads at http://localhost:5000/uploads/...
+    // Backend serves uploads
     if (rawUrl.startsWith('/uploads')) {
-      return `http://localhost:5000${rawUrl}`;
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+      return `${BACKEND_URL}${rawUrl}`;
     }
     return rawUrl;
   };
