@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   FaSearch,
@@ -11,7 +11,8 @@ import {
   FaListUl,
   FaCode,
   FaRandom,
-  FaCheckCircle
+  FaCheckCircle,
+  FaChartBar
 } from 'react-icons/fa';
 import { dashboardAPI } from '../../services/api/dashboardAPI';
 import Sidebar from '../StudentDashboard/components/Sidebar';
@@ -19,20 +20,52 @@ import Header from '../StudentDashboard/components/Header';
 
 const StudentAvailableExams = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch dashboard data to get available exams
+  // Fetch dashboard data to get available exams with optimized caching
   const { data: dashboardData, isLoading, error } = useQuery({
     queryKey: ['studentDashboard'],
     queryFn: async () => {
       const response = await dashboardAPI.getDashboard();
       return response;
     },
-    refetchOnWindowFocus: false,
-    retry: 1
+    refetchOnWindowFocus: false, // Disabled to prevent excessive requests
+    refetchOnMount: true, // Only refetch on mount
+    refetchOnReconnect: false, // Disabled to prevent excessive requests
+    staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
+    cacheTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    retry: 1,
+    retryDelay: 2000,
   });
 
-  const availableExams = dashboardData?.availableExams || [];
+  // Refetch when component becomes visible (returning from result page) - with debouncing
+  useEffect(() => {
+    let visibilityTimeout = null;
+    
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Debounce visibility change to prevent rapid refetches
+        if (visibilityTimeout) {
+          clearTimeout(visibilityTimeout);
+        }
+        visibilityTimeout = setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['studentDashboard'] });
+        }, 2000); // Wait 2 seconds before refetching
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (visibilityTimeout) {
+        clearTimeout(visibilityTimeout);
+      }
+    };
+  }, [queryClient]);
+
+  // Remove attempted exams from available list
+  const availableExams = (dashboardData?.availableExams || []).filter((exam) => !exam.hasAttempted);
 
   // Filter exams based on search query
   const filteredExams = useMemo(() => {
@@ -274,6 +307,16 @@ const StudentAvailableExams = () => {
                             )}
                           </div>
                           
+                          {exam.hasAttempted ? (
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/student/results/${exam.id}`)}
+                              className="px-6 py-2.5 rounded-lg font-medium text-sm transition-colors bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm hover:shadow flex items-center gap-2"
+                            >
+                              <FaChartBar className="w-3 h-3" />
+                              View Result
+                            </button>
+                          ) : (
                           <button
                             type="button"
                             disabled={!canStart || expired}
@@ -297,6 +340,7 @@ const StudentAvailableExams = () => {
                               'Not Started'
                             )}
                           </button>
+                          )}
                         </div>
                       </div>
                     </div>

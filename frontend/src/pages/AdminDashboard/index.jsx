@@ -51,7 +51,7 @@ const StatCard = ({ label, value, percent, accent }) => (
   </div>
 );
 
-const AdminDashboard = () => {
+const AdminDashboard = ({ overrideContent, activeKey = 'dashboard' }) => {
   const navigate = useNavigate();
   const admin = adminAuthAPI.getCurrentAdmin();
   const [scheduledExams, setScheduledExams] = useState([]);
@@ -107,17 +107,18 @@ const AdminDashboard = () => {
         </div>
 
         <nav className="space-y-2">
-          <SidebarLink icon={FaChartPie} label="Dashboard" active />
+          <SidebarLink icon={FaChartPie} label="Dashboard" active={activeKey === 'dashboard'} onClick={() => navigate('/admin/dashboard')} />
           <SidebarLink
             icon={FaCalendarAlt}
             label="Schedule Exams"
+            active={activeKey === 'schedule'}
             onClick={() => navigate('/admin/scheduled-exams')}
           />
-          <SidebarLink icon={FaUserGraduate} label="Students" onClick={() => navigate('/admin/students')} />
-          <SidebarLink icon={FaChalkboardTeacher} label="Teachers" />
-          <SidebarLink icon={FaUsers} label="Profile" />
-          <SidebarLink icon={FaCog} label="System Configuration" />
-          <SidebarLink icon={FaBell} label="Settings" />
+          <SidebarLink icon={FaUserGraduate} label="Students" active={activeKey === 'students'} onClick={() => navigate('/admin/students')} />
+          <SidebarLink icon={FaChalkboardTeacher} label="Teachers" active={activeKey === 'teachers'} onClick={() => navigate('/admin/teachers')} />
+          <SidebarLink icon={FaUsers} label="Profile" active={activeKey === 'profile'} onClick={() => navigate('/admin/profile')} />
+          <SidebarLink icon={FaCog} label="System Configuration" active={activeKey === 'config'} onClick={() => navigate('/admin/system-config')} />
+          <SidebarLink icon={FaBell} label="Announcements" active={activeKey === 'announcements'} onClick={() => navigate('/admin/announcements')} />
         </nav>
 
         <button
@@ -169,6 +170,10 @@ const AdminDashboard = () => {
 
         {/* Content */}
         <main className="p-6 space-y-6">
+          {overrideContent ? (
+            overrideContent
+          ) : (
+            <>
           {/* Scheduled Exams */}
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200 shadow-sm">
@@ -314,6 +319,8 @@ const AdminDashboard = () => {
               </div>
             </div>
           </section>
+            </>
+          )}
         </main>
       </div>
     </div>

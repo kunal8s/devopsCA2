@@ -33,6 +33,8 @@
     "nodemailer": "^6.10.1",
     "nodemailer-smtp-transport": "^2.7.4",
     "prom-client": "^15.1.3",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "winston": "^3.13.1"
   },
   "devDependencies": {

@@ -12,6 +12,8 @@ const QuickStatsCard = ({ stats }) => {
   } = stats || {};
 
   // Calculate completion percentage
+  // Use averagePercentage for display (it's more accurate as it's the average of individual percentages)
+  const displayAverage = averagePercentage > 0 ? averagePercentage : 0;
   const completionPercentage = totalExams > 0 
     ? Math.round((examsCompleted / totalExams) * 100)
     : 0;
@@ -100,13 +102,13 @@ const QuickStatsCard = ({ stats }) => {
         <CircularProgress
           percentage={completionPercentage}
           label="Exams Completed"
-          value={`${examsCompleted}/${totalExams}`}
+          value={`${examsCompleted}${totalExams > 0 ? `/${totalExams}` : ''}`}
           color="blue"
         />
         <CircularProgress
-          percentage={averagePercentage}
+          percentage={displayAverage}
           label="Average Score"
-          value={`${Math.round(averagePercentage)}%`}
+          value={`${Math.round(displayAverage)}%`}
           color="gray"
         />
       </div>
@@ -118,7 +120,7 @@ const QuickStatsCard = ({ stats }) => {
             Average Score
           </span>
           <span className="font-semibold text-slate-900">
-            {Math.round(averagePercentage)}%
+            {Math.round(displayAverage)}%
           </span>
         </div>
         <div className="flex items-center justify-between text-sm">

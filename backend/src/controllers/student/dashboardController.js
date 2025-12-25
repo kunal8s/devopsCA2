@@ -9,14 +9,15 @@ const ApiResponse = require('../../utils/helpers/apiResponse');
 const logger = require('../../utils/helpers/logger');
 
 /**
- * Calculate student statistics
+ * Calculate student statistics based on real-time attempt data
+ * Returns accurate counts and averages from actual submitted tests
  */
 const calculateStudentStats = async (studentId) => {
   try {
-    // Get all completed attempts
+    // Get all completed/submitted attempts (real-time data from database)
     const completedAttempts = await Attempt.find({
       student: studentId,
-      status: { $in: ['completed', 'submitted', 'graded'] }
+      status: { $in: ['submitted', 'graded', 'completed'] }
     })
       .populate('test', 'title course totalMarks scheduledDate')
       .lean();
@@ -56,28 +57,53 @@ const calculateStudentStats = async (studentId) => {
       }
     });
 
-    const averageScore = totalMarksPossible > 0 
-      ? (totalMarksObtained / totalMarksPossible) * 100 
-      : 0;
-    
+    // Calculate average percentage from individual attempt percentages
+    // This is the average of all attempt percentages
     const averagePercentage = totalAttempts > 0
       ? completedAttempts.reduce((sum, attempt) => sum + (attempt.percentage || 0), 0) / totalAttempts
       : 0;
 
-    // Get total available exams (scheduled + active)
-    const totalExams = await Test.countDocuments({
-      status: { $in: ['scheduled', 'active'] },
+    // Calculate average score as weighted average (total marks obtained / total marks possible)
+    // This gives a more accurate representation when tests have different total marks
+    const averageScore = totalMarksPossible > 0 
+      ? (totalMarksObtained / totalMarksPossible) * 100 
+      : 0;
+    
+    // Get all exams allocated to this student
+    const studentObjectId = mongoose.Types.ObjectId.isValid(studentId) 
+      ? new mongoose.Types.ObjectId(studentId) 
+      : studentId;
+
+    // Get all unique tests that student has access to (regardless of status)
+    const allAllocatedTests = await Test.find({
       $or: [
-        { allowedStudents: { $size: 0 } }, // No restrictions
-        { allowedStudents: { $in: [studentId] } } // Student is in allowed list
+        { allowedStudents: { $size: 0 } }, // No restrictions - available to all
+        { allowedStudents: { $in: [studentObjectId] } } // Student is in allowed list
       ]
-    });
+    })
+      .select('_id')
+      .lean();
+
+    // Get unique test IDs from completed attempts
+    const completedTestIds = new Set(
+      completedAttempts
+        .map(a => a.test?._id?.toString())
+        .filter(Boolean)
+    );
+
+    // Total exams = all unique exams allocated to student
+    // This includes both completed and available exams
+    const totalAllocatedExams = allAllocatedTests.length;
+    
+    // Ensure totalExams is at least equal to completed exams
+    // This handles edge cases where a test might have been deleted but attempt exists
+    const totalExams = Math.max(totalAllocatedExams, completedTestIds.size, totalAttempts);
 
     return {
-      examsCompleted: totalAttempts,
-      totalExams: totalExams + totalAttempts, // Include completed exams in total
-      averageScore: Math.round(averageScore * 100) / 100,
-      averagePercentage: Math.round(averagePercentage * 100) / 100,
+      examsCompleted: totalAttempts, // Number of submitted attempts
+      totalExams: totalExams, // Total exams allocated to student
+      averageScore: Math.round(averageScore * 100) / 100, // Weighted average score
+      averagePercentage: Math.round(averagePercentage * 100) / 100, // Average of individual percentages
       totalTimeSpent: Math.round((totalTimeSpent / 3600) * 100) / 100, // Convert to hours
       totalMarksObtained: Math.round(totalMarksObtained * 100) / 100,
       totalMarksPossible: Math.round(totalMarksPossible * 100) / 100,
@@ -91,25 +117,44 @@ const calculateStudentStats = async (studentId) => {
 };
 
 /**
- * Get performance trends (last 6 months)
+ * Get performance trends - returns both monthly aggregates and individual test attempts
+ * Similar to LeetCode contest history
  */
 const getPerformanceTrends = async (studentId) => {
   try {
+    // Get all submitted attempts (no time limit for individual tests)
+    const attempts = await Attempt.find({
+      student: studentId,
+      status: { $in: ['submitted', 'graded', 'completed'] }
+    })
+      .populate('test', 'title course testType scheduledDate totalMarks')
+      .sort({ submittedAt: -1 }) // Most recent first
+      .limit(50); // Limit to last 50 attempts
+
+    // Individual test attempts for detailed view
+    const individualAttempts = attempts.map(attempt => ({
+      testId: attempt.test?._id?.toString(),
+      testTitle: attempt.test?.title || 'Unknown Test',
+      testType: attempt.test?.testType || 'mcq',
+      submittedAt: attempt.submittedAt,
+      percentage: attempt.percentage || 0,
+      marksObtained: attempt.totalMarks || 0,
+      marksPossible: attempt.test?.totalMarks || 0,
+      isPassed: attempt.isPassed || false,
+      date: attempt.submittedAt ? attempt.submittedAt.toISOString().split('T')[0] : null
+    }));
+
+    // Monthly aggregates for trend visualization (last 6 months)
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-    const attempts = await Attempt.find({
-      student: studentId,
-      status: { $in: ['completed', 'submitted', 'graded'] },
-      submittedAt: { $gte: sixMonthsAgo }
-    })
-      .populate('test', 'title course scheduledDate')
-      .sort({ submittedAt: 1 });
+    const recentAttempts = attempts.filter(attempt => 
+      attempt.submittedAt && attempt.submittedAt >= sixMonthsAgo
+    );
 
-    // Group by month
     const monthlyData = {};
     
-    attempts.forEach(attempt => {
+    recentAttempts.forEach(attempt => {
       if (attempt.submittedAt) {
         const monthKey = attempt.submittedAt.toISOString().substring(0, 7); // YYYY-MM
         if (!monthlyData[monthKey]) {
@@ -118,7 +163,8 @@ const getPerformanceTrends = async (studentId) => {
             totalMarks: 0,
             totalPossible: 0,
             count: 0,
-            percentage: 0
+            percentage: 0,
+            avgPercentage: 0
           };
         }
         
@@ -128,22 +174,54 @@ const getPerformanceTrends = async (studentId) => {
       }
     });
 
-    // Calculate percentages and format
-    const trends = Object.values(monthlyData).map(data => ({
+    // Calculate monthly averages
+    const monthlyTrends = Object.values(monthlyData).map(data => {
+      const avgPercentage = data.totalPossible > 0 
+        ? Math.round((data.totalMarks / data.totalPossible) * 100 * 100) / 100
+        : 0;
+      
+      return {
       month: data.month,
-      percentage: data.totalPossible > 0 
-        ? Math.round((data.totalMarks / data.totalPossible) * 100)
-        : 0,
-      examsCount: data.count
-    }));
+        percentage: avgPercentage,
+        examsCount: data.count,
+        totalMarks: Math.round(data.totalMarks * 100) / 100,
+        totalPossible: Math.round(data.totalPossible * 100) / 100
+      };
+    });
 
     // Sort by month
-    trends.sort((a, b) => a.month.localeCompare(b.month));
+    monthlyTrends.sort((a, b) => a.month.localeCompare(b.month));
 
-    return trends;
+    // Calculate overall statistics
+    const totalAttempts = individualAttempts.length;
+    const avgPercentage = totalAttempts > 0
+      ? Math.round((individualAttempts.reduce((sum, a) => sum + a.percentage, 0) / totalAttempts) * 100) / 100
+      : 0;
+
+    return {
+      individualAttempts,
+      monthlyTrends,
+      statistics: {
+        totalAttempts,
+        avgPercentage,
+        bestScore: individualAttempts.length > 0 
+          ? Math.max(...individualAttempts.map(a => a.percentage))
+          : 0,
+        recentScore: individualAttempts.length > 0 ? individualAttempts[0].percentage : 0
+      }
+    };
   } catch (error) {
     logger.error('Error getting performance trends:', error);
-    return [];
+    return {
+      individualAttempts: [],
+      monthlyTrends: [],
+      statistics: {
+        totalAttempts: 0,
+        avgPercentage: 0,
+        bestScore: 0,
+        recentScore: 0
+      }
+    };
   }
 };
 
@@ -276,11 +354,12 @@ const getAvailableExams = async (studentId) => {
       });
     }
 
-    // Check which exams have been attempted
+    // Check which exams have been attempted (only submitted/completed attempts)
     const examIds = availableExams.map(exam => exam._id);
     const attempts = await Attempt.find({
       student: studentId,
-      test: { $in: examIds }
+      test: { $in: examIds },
+      status: { $in: ['submitted', 'graded', 'completed'] }
     });
 
     const attemptMap = new Map();
@@ -288,7 +367,8 @@ const getAvailableExams = async (studentId) => {
       attemptMap.set(attempt.test.toString(), attempt);
     });
 
-    return availableExams.map(exam => {
+    return availableExams
+      .map(exam => {
       // Determine test type - use testType field if available, otherwise infer from course
       let testType = 'MCQ';
       if (exam.testType) {
@@ -301,7 +381,7 @@ const getAvailableExams = async (studentId) => {
         testType = 'HYBRID';
       }
 
-      return {
+        const examData = {
         id: exam._id,
         title: exam.title,
         course: exam.course,
@@ -317,7 +397,10 @@ const getAvailableExams = async (studentId) => {
         hasAttempted: attemptMap.has(exam._id.toString()),
         status: exam.status
       };
-    });
+        return examData;
+      })
+      // Remove exams already attempted
+      .filter(exam => !exam.hasAttempted);
   } catch (error) {
     logger.error('Error getting available exams:', error);
     return [];

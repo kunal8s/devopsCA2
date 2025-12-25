@@ -47,7 +47,7 @@ const StudentDashboard = () => {
     }
   }, [navigate]);
 
-  // Fetch dashboard data
+  // Fetch dashboard data with optimized caching to prevent rate limiting
   const { data: dashboardData, isLoading, error } = useQuery({
     queryKey: ['studentDashboard'],
     queryFn: async () => {
@@ -55,8 +55,13 @@ const StudentDashboard = () => {
       // axiosClient already returns response.data, so just return it
       return response;
     },
-    refetchOnWindowFocus: false,
-    retry: 1
+    refetchOnWindowFocus: false, // Disabled to prevent excessive requests
+    refetchOnMount: true, // Only refetch on mount
+    refetchOnReconnect: false, // Disabled to prevent excessive requests
+    staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes (increased from 30 seconds)
+    cacheTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    retry: 1,
+    retryDelay: 2000, // Wait 2 seconds before retry
   });
 
   if (isLoading) {

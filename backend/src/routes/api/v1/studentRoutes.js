@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const dashboardController = require('../../../controllers/student/dashboardController');
+const announcementController = require('../../../controllers/announcement/announcementController');
 const authMiddleware = require('../../../middleware/auth');
 
 // All routes require authentication
@@ -8,6 +9,10 @@ router.use(authMiddleware.protect);
 
 // Dashboard routes
 router.get('/dashboard', dashboardController.getDashboard);
+
+// Announcement routes
+router.get('/announcements', announcementController.getStudentAnnouncements);
+router.post('/announcements/:id/read', announcementController.markStudentAnnouncementRead);
 
 // Debug endpoint to check student allocation
 router.get('/debug/tests', async (req, res) => {

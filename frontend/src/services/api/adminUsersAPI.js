@@ -58,6 +58,87 @@ export const adminUsersAPI = {
 
     return { teachers, count };
   },
+
+  /**
+   * Fetch teachers by university (partial, case-insensitive)
+   * @param {string} university
+   * @returns {Promise<{teachers: [], count: number}>}
+   */
+  getTeachersByUniversity: async (university) => {
+    if (!university || !university.trim()) {
+      return { teachers: [], count: 0 };
+    }
+
+    // Use exact university name (trimmed)
+    const params = { university: university.trim() };
+
+    const res = await axiosClient.get('/v1/admin/teachers/by-university', { params });
+    const payload = res?.data ?? res;
+    const apiData = payload?.data ?? payload;
+
+    const teachers = Array.isArray(apiData?.teachers) ? apiData.teachers : [];
+    const count =
+      typeof apiData?.count === 'number'
+        ? apiData.count
+        : Array.isArray(teachers)
+        ? teachers.length
+        : 0;
+
+    return { data: { teachers, count }, teachers, count };
+  },
+
+  /**
+   * Get all unique universities for autocomplete
+   * @param {string} search - Optional search term
+   * @returns {Promise<{universities: string[]}>}
+   */
+  getUniversities: async (search = '') => {
+    const params = search ? { search } : {};
+    const res = await axiosClient.get('/v1/admin/universities', { params });
+    const payload = res?.data ?? res;
+    const apiData = payload?.data ?? payload;
+    return {
+      universities: Array.isArray(apiData?.universities) ? apiData.universities : []
+    };
+  },
+
+  /**
+   * Delete a student by ID
+   * @param {string} studentId - Student ID to delete
+   * @returns {Promise<{success: boolean, message: string}>}
+   */
+  deleteStudent: async (studentId) => {
+    if (!studentId) {
+      throw new Error('Student ID is required');
+    }
+
+    const res = await axiosClient.delete(`/v1/admin/students/${studentId}`);
+    const payload = res?.data ?? res;
+    
+    return {
+      success: true,
+      message: payload?.message || 'Student deleted successfully'
+    };
+  },
+
+  /**
+   * Delete a teacher by ID
+   * @param {string} teacherId - Teacher ID to delete
+   * @returns {Promise<{success: boolean, message: string}>}
+   */
+  deleteTeacher: async (teacherId) => {
+    if (!teacherId) {
+      throw new Error('Teacher ID is required');
+    }
+
+    const res = await axiosClient.delete(`/v1/admin/teachers/${teacherId}`);
+    const payload = res?.data ?? res;
+    
+    return {
+      success: true,
+      message: payload?.message || 'Teacher deleted successfully'
+    };
+  },
 };
 
 export default adminUsersAPI;
