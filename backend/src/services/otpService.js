@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const OTP = require('../models/otp');
+const OTP = require('../models/OTP');
 const Student = require('../models/Student');
 
 class OTPService {
