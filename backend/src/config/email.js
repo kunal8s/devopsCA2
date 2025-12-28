@@ -6,51 +6,58 @@ const port = process.env.SMTP_PORT || process.env.EMAIL_PORT;
 const username = process.env.SMTP_USERNAME || process.env.EMAIL_USER;
 const password = process.env.SMTP_PASSWORD || process.env.EMAIL_PASS;
 
-// Create transporter if credentials are available
+// Support for SendGrid (cloud-friendly alternative)
+const sendGridApiKey = process.env.SENDGRID_API_KEY;
+
+// Create transporter
 let transporter;
 
-if (host && port && username && password) {
+// Priority 1: Use SendGrid if available (best for cloud)
+if (sendGridApiKey) {
+  transporter = nodemailer.createTransport({
+    service: 'SendGrid',
+    auth: {
+      user: 'apikey',
+      pass: sendGridApiKey
+    }
+  });
+  console.log('✓ Using SendGrid for email delivery (cloud-optimized)');
+}
+// Priority 2: Use SMTP if configured
+else if (host && port && username && password) {
   const portNum = Number(port);
   const isSecure = portNum === 465;
   
+  // Create transporter with cloud-optimized settings
   transporter = nodemailer.createTransport({
     host: host,
     port: portNum,
-    secure: isSecure, // true for 465, false for other ports
-    requireTLS: !isSecure && portNum === 587, // Use TLS for port 587
+    secure: isSecure,
+    requireTLS: !isSecure && (portNum === 587 || portNum === 25),
     auth: {
       user: username,
       pass: password,
     },
-    // Increase timeouts to prevent connection timeouts
-    connectionTimeout: 60000, // 60 seconds
-    greetingTimeout: 30000, // 30 seconds
-    socketTimeout: 60000, // 60 seconds
-    // Disable pooling for better reliability
+    // Optimized for cloud environments
+    connectionTimeout: 20000, // 20 seconds - shorter for faster failure detection
+    greetingTimeout: 10000, // 10 seconds
+    socketTimeout: 20000, // 20 seconds
+    // Disable pooling for cloud environments
     pool: false,
-    // Retry configuration
+    // Cloud-friendly TLS settings
     tls: {
-      // Do not fail on invalid certificates
       rejectUnauthorized: false,
-      // Allow legacy TLS
-      minVersion: 'TLSv1',
+      minVersion: 'TLSv1.2',
+      ciphers: 'SSLv3'
     },
-  });
-
-  // Verify connection on startup
-  transporter.verify((error, success) => {
-    if (error) {
-      console.error('SMTP connection verification failed:', error.message);
-      console.error('SMTP Config:', {
-        host,
-        port: portNum,
-        secure: isSecure,
-        username: username.substring(0, 3) + '***' // Partially hide username
-      });
-    } else {
-      console.log('✓ SMTP server connection verified successfully');
+    // Disable DNS lookup caching (can cause issues in cloud)
+    dns: {
+      cache: false
     }
   });
+
+  // Don't verify on startup - verify on first use instead (faster startup)
+  console.log('✓ SMTP transporter configured (will verify on first email send)');
 } else {
   // Fallback to jsonTransport if no email config is available
   transporter = nodemailer.createTransport({
@@ -58,6 +65,7 @@ if (host && port && username && password) {
   });
   console.warn('⚠ Email configuration not found. Using fallback mode (emails will not be sent).');
   console.warn('Required variables: SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD');
+  console.warn('OR use SENDGRID_API_KEY for cloud-optimized email delivery');
 }
 
 module.exports = transporter;

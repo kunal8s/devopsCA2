@@ -30,35 +30,42 @@ exports.sendOTP = asyncHandler(async (req, res) => {
   // Generate and save OTP
   const otp = await OTPService.createOTP(email, 'signup');
 
-  // Send OTP via email - wait for it to complete (with timeout)
+  // Try to send email immediately (with fast timeout for cloud)
+  // If it fails quickly, queue it for background retry
+  const emailQueue = require('../../services/emailQueue');
+  
+  let emailSent = false;
+  
   try {
-    const emailSent = await Promise.race([
+    // Try immediate send with 10 second timeout (fast response)
+    emailSent = await Promise.race([
       EmailService.sendOTP(email, otp),
-      new Promise((resolve) => setTimeout(() => resolve(false), 25000)) // 25 second timeout
+      new Promise((resolve) => setTimeout(() => resolve(false), 10000)) // 10 second timeout
     ]);
 
     if (emailSent) {
       res.status(200).json(
         new ApiResponse(200, { email }, 'OTP sent successfully. Please check your email.')
       );
-    } else {
-      // Email failed but OTP is saved - still allow user to proceed
-      console.warn(`OTP generated for ${email} but email sending failed. OTP: ${otp}`);
-      res.status(200).json(
-        new ApiResponse(200, { 
-          email,
-          warning: 'Email delivery may be delayed. OTP has been generated.'
-        }, 'OTP generated. Please check your email (may take a moment).')
-      );
+      return;
     }
   } catch (error) {
-    // Email error - but OTP is already saved in DB
-    console.error('Error in OTP email sending:', error);
+    console.warn('Immediate email send failed, queuing for retry:', error.message);
+  }
+
+  // If immediate send failed or timed out, queue for background processing
+  if (!emailSent) {
+    emailQueue.enqueue({
+      email,
+      otp,
+      sendFunction: async () => {
+        return await EmailService.sendOTP(email, otp);
+      }
+    });
+
+    // Return success immediately - email will be sent in background
     res.status(200).json(
-      new ApiResponse(200, { 
-        email,
-        warning: 'Email delivery issue. Please try again or contact support.'
-      }, 'OTP generated. If you don\'t receive an email, please try again.')
+      new ApiResponse(200, { email }, 'OTP sent successfully. Please check your email.')
     );
   }
 });

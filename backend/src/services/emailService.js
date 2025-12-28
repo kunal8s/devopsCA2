@@ -1,6 +1,50 @@
 const transporter = require('../config/email');
 
 class EmailService {
+  /**
+   * Send email with retry logic (optimized for cloud environments)
+   */
+  static async sendWithRetry(mailOptions, maxRetries = 3) {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Create a new promise for each attempt
+        const emailPromise = transporter.sendMail(mailOptions);
+        
+        // Shorter timeout for cloud environments (15 seconds per attempt)
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error(`Email timeout on attempt ${attempt}`)), 15000);
+        });
+        
+        const result = await Promise.race([emailPromise, timeoutPromise]);
+        
+        if (attempt > 1) {
+          console.log(`✓ Email sent successfully on attempt ${attempt}`);
+        }
+        
+        return { success: true, result };
+      } catch (error) {
+        lastError = error;
+        console.warn(`Email attempt ${attempt}/${maxRetries} failed:`, error.message);
+        
+        // Don't retry on certain errors
+        if (error.code === 'EAUTH' || error.responseCode === 535) {
+          console.error('Authentication failed - check SMTP credentials');
+          break;
+        }
+        
+        // Wait before retry (exponential backoff)
+        if (attempt < maxRetries) {
+          const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
+    }
+    
+    return { success: false, error: lastError };
+  }
+
   static async sendOTP(email, otp) {
     if (!transporter) {
       console.error('Email transporter not initialized');
@@ -26,46 +70,38 @@ class EmailService {
       `,
     };
 
-    try {
-      // Set a longer timeout for email sending (30 seconds)
-      const emailPromise = transporter.sendMail(mailOptions);
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Email sending timeout after 30 seconds')), 30000);
-      });
-      
-      const result = await Promise.race([emailPromise, timeoutPromise]);
+    const { success, result, error } = await this.sendWithRetry(mailOptions, 3);
+    
+    if (success) {
       console.log('✓ OTP email sent successfully to:', email);
-      console.log('Email response:', {
-        messageId: result.messageId,
-        accepted: result.accepted,
-        rejected: result.rejected
-      });
-      return true;
-    } catch (error) {
-      // Log detailed error information
-      console.error('✗ Email sending failed:', error.message);
-      console.error('Email error details:', {
-        message: error.message,
-        code: error.code,
-        command: error.command,
-        response: error.response,
-        responseCode: error.responseCode,
-        errno: error.errno,
-        syscall: error.syscall,
-        address: error.address,
-        port: error.port
-      });
-      
-      // Check if it's a connection issue
-      if (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED') {
-        console.error('SMTP connection issue. Check:');
-        console.error('1. SMTP_HOST is correct');
-        console.error('2. SMTP_PORT is correct (587 for TLS, 465 for SSL)');
-        console.error('3. Firewall allows connections from Render');
-        console.error('4. SMTP credentials are correct');
+      if (result) {
+        console.log('Email details:', {
+          messageId: result.messageId,
+          accepted: result.accepted,
+          rejected: result.rejected
+        });
       }
-      
-      // Return false - email failed
+      return true;
+    } else {
+      console.error('✗ Email sending failed after all retries');
+      if (error) {
+        console.error('Final error:', {
+          message: error.message,
+          code: error.code,
+          command: error.command,
+          responseCode: error.responseCode
+        });
+        
+        // Provide helpful error messages
+        if (error.code === 'ETIMEDOUT' || error.message.includes('timeout')) {
+          console.error('⚠ SMTP connection timeout. This often happens in cloud environments.');
+          console.error('💡 Solution: Use SendGrid (SENDGRID_API_KEY) or check SMTP firewall settings');
+        } else if (error.code === 'ECONNREFUSED') {
+          console.error('⚠ SMTP connection refused. Check SMTP_HOST and SMTP_PORT');
+        } else if (error.code === 'EAUTH') {
+          console.error('⚠ SMTP authentication failed. Check SMTP_USERNAME and SMTP_PASSWORD');
+        }
+      }
       return false;
     }
   }
