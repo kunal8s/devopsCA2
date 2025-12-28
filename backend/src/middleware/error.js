@@ -46,6 +46,21 @@ exports.errorHandler = (err, req, res, next) => {
     error.statusCode = 401;
   }
 
+  // Ensure CORS headers are set even on errors
+  const origin = req.headers.origin;
+  if (origin) {
+    const allowedOrigins = process.env.FRONTEND_URL 
+      ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+      : ['http://localhost:5173', 'https://virtualxam-fp5e.onrender.com'];
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    }
+  }
+
   res.status(error.statusCode || 500).json(
     new ApiResponse(error.statusCode || 500, null, error.message || 'Internal Server Error')
   );

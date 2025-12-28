@@ -23,13 +23,12 @@ const apiRoutes = require('./src/routes/api');
 
 const app = express();
 
-// Security middleware remove this written from remove part
-app.use(helmet());
 // Parse allowed origins from environment or use defaults
 const allowedOrigins = process.env.FRONTEND_URL 
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
   : ['http://localhost:5173', 'https://virtualxam-fp5e.onrender.com'];
 
+// CORS MUST be before Helmet to work properly
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -44,6 +43,13 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
+// Security middleware - AFTER CORS to not interfere with CORS headers
+app.use(helmet({
+  // Configure Helmet to not interfere with CORS
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false
 }));
 
 // Rate limiting - increased limits for dashboard endpoints

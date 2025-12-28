@@ -26,10 +26,31 @@ class StatsController {
       
       logger.info('Home stats fetched successfully');
       
-      return res.status(200).json(new ApiResponse(200, stats, 'Home statistics retrieved'));
+      res.status(200).json(new ApiResponse(200, stats, 'Home statistics retrieved'));
     } catch (error) {
       logger.error('Error fetching home stats:', error);
-      return res.status(500).json(new ApiResponse(500, null, 'Failed to fetch statistics'));
+      logger.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
+      // Ensure CORS headers are set on error
+      const origin = req.headers.origin;
+      if (origin) {
+        const allowedOrigins = process.env.FRONTEND_URL 
+          ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+          : ['http://localhost:5173', 'https://virtualxam-fp5e.onrender.com'];
+        
+        if (allowedOrigins.indexOf(origin) !== -1) {
+          res.setHeader('Access-Control-Allow-Origin', origin);
+          res.setHeader('Access-Control-Allow-Credentials', 'true');
+          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+        }
+      }
+      
+      res.status(500).json(new ApiResponse(500, null, 'Failed to fetch statistics'));
     }
   }
 
@@ -77,63 +98,68 @@ class StatsController {
 
   // Helper methods
   async calculateHomeStats() {
-    // This would typically query your database
-    // For now, return mock data with some randomization for realism
-    const now = new Date();
-    
-    return {
-      platformStats: [
-        { 
-          label: 'Active Exams', 
-          value: this.formatNumber(Math.floor(Math.random() * 2000) + 1500),
-          icon: '📊',
-          trend: '+12%'
+    try {
+      // This would typically query your database
+      // For now, return mock data with some randomization for realism
+      const now = new Date();
+      
+      return {
+        platformStats: [
+          { 
+            label: 'Active Exams', 
+            value: this.formatNumber(Math.floor(Math.random() * 2000) + 1500),
+            icon: 'chart', // Use text instead of emoji to avoid serialization issues
+            trend: '+12%'
+          },
+          { 
+            label: 'Total Students', 
+            value: '25,000+',
+            icon: 'users',
+            trend: '+8%'
+          },
+          { 
+            label: 'Institutions', 
+            value: '500+',
+            icon: 'building',
+            trend: '+15%'
+          },
+          { 
+            label: 'Success Rate', 
+            value: '99.8%',
+            icon: 'target',
+            trend: '+0.2%'
+          },
+        ],
+        recentActivity: [
+          { 
+            type: 'exam_started', 
+            count: Math.floor(Math.random() * 200) + 100,
+            time: '2 hours ago'
+          },
+          { 
+            type: 'exam_completed', 
+            count: Math.floor(Math.random() * 150) + 50,
+            time: '5 hours ago'
+          },
+          { 
+            type: 'user_registered', 
+            count: Math.floor(Math.random() * 100) + 20,
+            time: 'Today'
+          },
+        ],
+        performanceMetrics: {
+          avgCompletionTime: '45min',
+          avgScore: '82%',
+          satisfactionRate: '96%',
+          systemUptime: '99.99%',
         },
-        { 
-          label: 'Total Students', 
-          value: '25,000+',
-          icon: '👨‍🎓',
-          trend: '+8%'
-        },
-        { 
-          label: 'Institutions', 
-          value: '500+',
-          icon: '🏫',
-          trend: '+15%'
-        },
-        { 
-          label: 'Success Rate', 
-          value: '99.8%',
-          icon: '🎯',
-          trend: '+0.2%'
-        },
-      ],
-      recentActivity: [
-        { 
-          type: 'exam_started', 
-          count: Math.floor(Math.random() * 200) + 100,
-          time: '2 hours ago'
-        },
-        { 
-          type: 'exam_completed', 
-          count: Math.floor(Math.random() * 150) + 50,
-          time: '5 hours ago'
-        },
-        { 
-          type: 'user_registered', 
-          count: Math.floor(Math.random() * 100) + 20,
-          time: 'Today'
-        },
-      ],
-      performanceMetrics: {
-        avgCompletionTime: '45min',
-        avgScore: '82%',
-        satisfactionRate: '96%',
-        systemUptime: '99.99%',
-      },
-      timestamp: now.toISOString(),
-      cacheTTL: 300 // 5 minutes
-    };
+        timestamp: now.toISOString(),
+        cacheTTL: 300 // 5 minutes
+      };
+    } catch (error) {
+      logger.error('Error in calculateHomeStats:', error);
+      throw error; // Re-throw to be caught by getHomeStats
+    }
   }
 
   async calculateAnalytics(period) {
