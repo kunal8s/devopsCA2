@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
+const MongoStore = require('connect-mongo');
 const { errorHandler } = require('./src/middleware/error.js');
 const metricsMiddleware = require('./src/middleware/metricsMiddleware');
 const { register: metricsRegister } = require('./src/metrics/metrics');
@@ -102,6 +103,12 @@ app.use(
     secret: process.env.SESSION_SECRET || 'exam-proctoring-session-secret',
     resave: false,
     saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGO_URI,
+      ttl: 30 * 60, // 30 minutes (in seconds)
+      autoRemove: 'native',
+      touchAfter: 24 * 3600 // lazy session update (24 hours)
+    }),
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
