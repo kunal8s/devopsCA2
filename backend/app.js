@@ -103,7 +103,7 @@ app.use(
     secret: process.env.SESSION_SECRET || 'exam-proctoring-session-secret',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({
+    store: new MongoStore({
       mongoUrl: process.env.MONGO_URI,
       ttl: 30 * 60, // 30 minutes (in seconds)
       autoRemove: 'native',
