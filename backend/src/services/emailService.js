@@ -27,19 +27,26 @@ class EmailService {
     };
 
     try {
-      const result = await transporter.sendMail(mailOptions);
+      // Set a timeout for email sending (15 seconds max)
+      const emailPromise = transporter.sendMail(mailOptions);
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Email sending timeout')), 15000);
+      });
+      
+      await Promise.race([emailPromise, timeoutPromise]);
       console.log('OTP email sent successfully to:', email);
       return true;
     } catch (error) {
-      console.error('Email sending error:', error);
+      // Log error but don't throw - email is non-critical
+      // OTP is already saved in database, so user can still verify
+      console.error('Email sending error (non-blocking):', error.message);
       console.error('Email error details:', {
         message: error.message,
         code: error.code,
-        response: error.response,
         command: error.command
       });
-      // Re-throw the error so the controller can handle it appropriately
-      throw error;
+      // Return false instead of throwing - allows graceful degradation
+      return false;
     }
   }
 

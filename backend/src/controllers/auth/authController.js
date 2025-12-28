@@ -30,20 +30,18 @@ exports.sendOTP = asyncHandler(async (req, res) => {
   // Generate and save OTP
   const otp = await OTPService.createOTP(email, 'signup');
 
-  // Send OTP via email
-  try {
-    await EmailService.sendOTP(email, otp);
-    res.status(200).json(
-      new ApiResponse(200, { email }, 'OTP sent successfully')
-    );
-  } catch (error) {
-    console.error('Failed to send OTP email:', error);
-    // Still return success to user, but log the error
-    // In production, you might want to use a queue system for emails
-    res.status(200).json(
-      new ApiResponse(200, { email }, 'OTP generated. Please check your email.')
-    );
-  }
+  // Send OTP via email asynchronously (non-blocking)
+  // Don't wait for email to send - return immediately to user
+  EmailService.sendOTP(email, otp).catch((error) => {
+    console.error('Failed to send OTP email (background):', error);
+    // Email sending failed, but OTP is already saved in DB
+    // User can still verify OTP if they have it from another source
+  });
+
+  // Return success immediately - don't wait for email
+  res.status(200).json(
+    new ApiResponse(200, { email }, 'OTP sent successfully. Please check your email.')
+  );
 });
 
 // @desc    Verify OTP

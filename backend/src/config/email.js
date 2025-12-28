@@ -18,6 +18,14 @@ if (host && port && username && password) {
       user: username,
       pass: password,
     },
+    // Increase timeouts to prevent connection timeouts
+    connectionTimeout: 30000, // 30 seconds
+    greetingTimeout: 30000, // 30 seconds
+    socketTimeout: 30000, // 30 seconds
+    // Retry configuration
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 100,
   });
 } else {
   // Fallback to jsonTransport if no email config is available
