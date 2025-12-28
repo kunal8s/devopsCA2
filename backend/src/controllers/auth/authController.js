@@ -30,18 +30,37 @@ exports.sendOTP = asyncHandler(async (req, res) => {
   // Generate and save OTP
   const otp = await OTPService.createOTP(email, 'signup');
 
-  // Send OTP via email asynchronously (non-blocking)
-  // Don't wait for email to send - return immediately to user
-  EmailService.sendOTP(email, otp).catch((error) => {
-    console.error('Failed to send OTP email (background):', error);
-    // Email sending failed, but OTP is already saved in DB
-    // User can still verify OTP if they have it from another source
-  });
+  // Send OTP via email - wait for it to complete (with timeout)
+  try {
+    const emailSent = await Promise.race([
+      EmailService.sendOTP(email, otp),
+      new Promise((resolve) => setTimeout(() => resolve(false), 25000)) // 25 second timeout
+    ]);
 
-  // Return success immediately - don't wait for email
-  res.status(200).json(
-    new ApiResponse(200, { email }, 'OTP sent successfully. Please check your email.')
-  );
+    if (emailSent) {
+      res.status(200).json(
+        new ApiResponse(200, { email }, 'OTP sent successfully. Please check your email.')
+      );
+    } else {
+      // Email failed but OTP is saved - still allow user to proceed
+      console.warn(`OTP generated for ${email} but email sending failed. OTP: ${otp}`);
+      res.status(200).json(
+        new ApiResponse(200, { 
+          email,
+          warning: 'Email delivery may be delayed. OTP has been generated.'
+        }, 'OTP generated. Please check your email (may take a moment).')
+      );
+    }
+  } catch (error) {
+    // Email error - but OTP is already saved in DB
+    console.error('Error in OTP email sending:', error);
+    res.status(200).json(
+      new ApiResponse(200, { 
+        email,
+        warning: 'Email delivery issue. Please try again or contact support.'
+      }, 'OTP generated. If you don\'t receive an email, please try again.')
+    );
+  }
 });
 
 // @desc    Verify OTP

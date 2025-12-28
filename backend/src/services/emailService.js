@@ -27,25 +27,45 @@ class EmailService {
     };
 
     try {
-      // Set a timeout for email sending (15 seconds max)
+      // Set a longer timeout for email sending (30 seconds)
       const emailPromise = transporter.sendMail(mailOptions);
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Email sending timeout')), 15000);
+        setTimeout(() => reject(new Error('Email sending timeout after 30 seconds')), 30000);
       });
       
-      await Promise.race([emailPromise, timeoutPromise]);
-      console.log('OTP email sent successfully to:', email);
+      const result = await Promise.race([emailPromise, timeoutPromise]);
+      console.log('✓ OTP email sent successfully to:', email);
+      console.log('Email response:', {
+        messageId: result.messageId,
+        accepted: result.accepted,
+        rejected: result.rejected
+      });
       return true;
     } catch (error) {
-      // Log error but don't throw - email is non-critical
-      // OTP is already saved in database, so user can still verify
-      console.error('Email sending error (non-blocking):', error.message);
+      // Log detailed error information
+      console.error('✗ Email sending failed:', error.message);
       console.error('Email error details:', {
         message: error.message,
         code: error.code,
-        command: error.command
+        command: error.command,
+        response: error.response,
+        responseCode: error.responseCode,
+        errno: error.errno,
+        syscall: error.syscall,
+        address: error.address,
+        port: error.port
       });
-      // Return false instead of throwing - allows graceful degradation
+      
+      // Check if it's a connection issue
+      if (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED') {
+        console.error('SMTP connection issue. Check:');
+        console.error('1. SMTP_HOST is correct');
+        console.error('2. SMTP_PORT is correct (587 for TLS, 465 for SSL)');
+        console.error('3. Firewall allows connections from Render');
+        console.error('4. SMTP credentials are correct');
+      }
+      
+      // Return false - email failed
       return false;
     }
   }
