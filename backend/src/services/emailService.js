@@ -2,8 +2,13 @@ const transporter = require('../config/email');
 
 class EmailService {
   static async sendOTP(email, otp) {
+    if (!transporter) {
+      console.error('Email transporter not initialized');
+      throw new Error('Email service not configured');
+    }
+
     const mailOptions = {
-      from: process.env.EMAIL_FROM,
+      from: process.env.EMAIL_FROM || process.env.SMTP_USERNAME || 'noreply@examproctoring.com',
       to: email,
       subject: 'Your OTP for Student Registration',
       html: `
@@ -22,11 +27,19 @@ class EmailService {
     };
 
     try {
-      await transporter.sendMail(mailOptions);
+      const result = await transporter.sendMail(mailOptions);
+      console.log('OTP email sent successfully to:', email);
       return true;
     } catch (error) {
       console.error('Email sending error:', error);
-      return false;
+      console.error('Email error details:', {
+        message: error.message,
+        code: error.code,
+        response: error.response,
+        command: error.command
+      });
+      // Re-throw the error so the controller can handle it appropriately
+      throw error;
     }
   }
 
